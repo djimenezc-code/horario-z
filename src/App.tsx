@@ -1,83 +1,85 @@
 import React, { useState, useMemo, useEffect, useRef } from 'react';
 
+// --- CONFIGURACIÓN & ESTILOS ---
 const diasSemana = ['Domingo', 'Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado'];
-const diasFiltro = ['Todos', ...diasSemana.slice(1, 6)]; // Lun-Vie
+const diasFiltro = ['Todos', 'Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes'];
 const colores = ['indigo', 'cyan', 'fuchsia', 'amber'];
 
 const colorThemes = {
-  indigo:  { border: 'border-indigo-500',  text: 'text-indigo-400',  glow: 'shadow-indigo-500/20',  badge: 'bg-indigo-500',  icon: 'text-indigo-400'  },
-  cyan:    { border: 'border-cyan-400',    text: 'text-cyan-400',    glow: 'shadow-cyan-400/20',    badge: 'bg-cyan-400',    icon: 'text-cyan-400'    },
-  fuchsia: { border: 'border-fuchsia-500', text: 'text-fuchsia-400', glow: 'shadow-fuchsia-500/20', badge: 'bg-fuchsia-500', icon: 'text-fuchsia-400' },
-  amber:   { border: 'border-amber-400',   text: 'text-amber-400',   glow: 'shadow-amber-400/20',   badge: 'bg-amber-400',   icon: 'text-amber-400'   },
+  indigo:  { 
+    border: 'border-indigo-500/50', 
+    text: 'text-indigo-400', 
+    glow: 'shadow-[0_0_20px_rgba(99,102,241,0.2)]', 
+    badge: 'bg-indigo-500', 
+    gradient: 'from-indigo-500/10 to-transparent' 
+  },
+  cyan: { 
+    border: 'border-cyan-400/50', 
+    text: 'text-cyan-400', 
+    glow: 'shadow-[0_0_20px_rgba(34,211,238,0.2)]', 
+    badge: 'bg-cyan-400', 
+    gradient: 'from-cyan-400/10 to-transparent' 
+  },
+  fuchsia: { 
+    border: 'border-fuchsia-500/50', 
+    text: 'text-fuchsia-400', 
+    glow: 'shadow-[0_0_20px_rgba(217,70,239,0.2)]', 
+    badge: 'bg-fuchsia-500', 
+    gradient: 'from-fuchsia-500/10 to-transparent' 
+  },
+  amber: { 
+    border: 'border-amber-400/50', 
+    text: 'text-amber-400', 
+    glow: 'shadow-[0_0_20px_rgba(251,191,36,0.2)]', 
+    badge: 'bg-amber-400', 
+    gradient: 'from-amber-400/10 to-transparent' 
+  },
 };
 
-const clasesIniciales = [
-  { id: 1, materia: 'Inteligencia Artificial', profesor: 'Dr. Alan Turing', sala: 'Lab 04 - Core', dia: 'Lunes', horario: '08:00 - 10:30', tipo: 'Teórica', color: 'indigo' },
-  { id: 2, materia: 'Desarrollo Web Fullstack', profesor: 'Ing. Ada Lovelace', sala: 'Virtual Hub A', dia: 'Miércoles', horario: '11:00 - 13:00', tipo: 'Práctica', color: 'cyan' },
-];
-
-const STORAGE_KEY = 'academix-flow-clases';
+const STORAGE_KEY = 'academix-neural-flow';
 
 export default function AcademiXFlow() {
   const [clases, setClases] = useState(() => {
-    if (typeof window === 'undefined') return clasesIniciales;
-    try {
-      const raw = localStorage.getItem(STORAGE_KEY);
-      return raw ? JSON.parse(raw) : clasesIniciales;
-    } catch { return clasesIniciales; }
+    if (typeof window === 'undefined') return [];
+    const raw = localStorage.getItem(STORAGE_KEY);
+    return raw ? JSON.parse(raw) : [];
   });
   const [busqueda, setBusqueda] = useState('');
   const [diaFiltro, setDiaFiltro] = useState('Todos');
   const [modalAbierto, setModalAbierto] = useState(false);
   const [horaActual, setHoraActual] = useState(new Date());
-
-  // FIX: Cola de alertas en vez de un solo valor para no perder notificaciones simultáneas
   const [alertas, setAlertas] = useState([]);
   const alertasDisparadas = useRef(new Set());
 
-  // FIX: Ref para evitar que el efecto de alertas se reinicie cada vez que cambia `clases`
-  const clasesRef = useRef(clases);
-  useEffect(() => { clasesRef.current = clases; }, [clases]);
-
   // Persistencia
   useEffect(() => {
-    try { localStorage.setItem(STORAGE_KEY, JSON.stringify(clases)); } catch {}
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(clases));
   }, [clases]);
 
-  // FIX: Un solo intervalo de 1s que maneja tanto el reloj como las alertas (cada 15s)
+  // Loop de tiempo y alertas
   useEffect(() => {
-    const checkAlertas = (ahora) => {
-      const diaHoy = diasSemana[ahora.getDay()];
-      const stampDia = ahora.toISOString().slice(0, 10);
-
-      for (const clase of clasesRef.current) {
-        if (clase.dia !== diaHoy) continue;
-        const [horaInicio] = clase.horario.split(' - ');
-        const [h, m] = horaInicio.split(':').map(Number);
-        const fechaClase = new Date(ahora);
-        fechaClase.setHours(h, m, 0, 0);
-        const diffMin = Math.round((fechaClase - ahora) / 60000);
-        const key = `${stampDia}-${clase.id}`;
-        if (diffMin <= 5 && diffMin >= -1 && !alertasDisparadas.current.has(key)) {
-          alertasDisparadas.current.add(key);
-          setAlertas(prev => [...prev, clase.materia]);
-        }
-      }
-    };
-
-    const id = setInterval(() => {
+    const timer = setInterval(() => {
       const ahora = new Date();
       setHoraActual(ahora);
-      if (ahora.getSeconds() % 15 === 0) checkAlertas(ahora);
+      
+      // Lógica de Alerta Capibara (Chequeo cada minuto exacto)
+      if (ahora.getSeconds() === 0) {
+        const diaHoy = diasSemana[ahora.getDay()];
+        clases.forEach(clase => {
+          if (clase.dia === diaHoy) {
+            const [h, m] = clase.horario.split(' - ')[0].split(':').map(Number);
+            const diff = (new Date(ahora).setHours(h, m, 0, 0) - ahora) / 60000;
+            const key = `${ahora.toDateString()}-${clase.id}`;
+            if (diff <= 5 && diff > 0 && !alertasDisparadas.current.has(key)) {
+              alertasDisparadas.current.add(key);
+              setAlertas(prev => [...prev, clase.materia]);
+            }
+          }
+        });
+      }
     }, 1000);
-
-    // Ejecutar de inmediato al montar
-    const ahora = new Date();
-    setHoraActual(ahora);
-    checkAlertas(ahora);
-
-    return () => clearInterval(id);
-  }, []); // Sin dependencias: no se reinicia nunca
+    return () => clearInterval(timer);
+  }, [clases]);
 
   const clasesFiltradas = useMemo(() => clases.filter(c => (
     (c.materia.toLowerCase().includes(busqueda.toLowerCase()) ||
@@ -85,123 +87,154 @@ export default function AcademiXFlow() {
     (diaFiltro === 'Todos' || c.dia === diaFiltro)
   )), [clases, busqueda, diaFiltro]);
 
-  const agregarClase = (nueva) => {
-    setClases(prev => [...prev, { ...nueva, id: Date.now() }]);
-    setModalAbierto(false);
-  };
-
-  const eliminarClase = (id) => setClases(prev => prev.filter(c => c.id !== id));
-
-  // FIX: Cerrar la primera alerta de la cola al presionar ×
-  const cerrarAlerta = () => setAlertas(prev => prev.slice(1));
-
   return (
-    <div className="min-h-screen bg-[#0F172A] text-slate-200 font-sans selection:bg-indigo-500/30">
-      {/* FIX: Notificación muestra la primera alerta de la cola */}
-      {alertas.length > 0 && (
-        <div className="fixed bottom-8 right-8 z-[100]">
-          <div className="bg-slate-900/90 backdrop-blur-xl border border-indigo-500/50 p-5 rounded-3xl shadow-[0_0_30px_rgba(79,70,229,0.3)] flex items-center gap-5">
-            <div className="relative">
-              <span className="absolute -top-1 -right-1 flex h-3 w-3">
-                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-indigo-400 opacity-75"></span>
-                <span className="relative inline-flex rounded-full h-3 w-3 bg-indigo-500"></span>
-              </span>
-              <div className="text-4xl">🦫</div>
-            </div>
-            <div className="flex-1">
-              <p className="text-xs font-black text-indigo-400 uppercase tracking-[0.2em]">Protocolo Capibara</p>
-              <p className="text-sm font-bold text-white">Inicio en 5 min: {alertas[0]}</p>
-              {alertas.length > 1 && (
-                <p className="text-xs text-slate-400 mt-1">+{alertas.length - 1} alerta(s) más</p>
-              )}
-            </div>
-            <button onClick={cerrarAlerta} className="text-slate-500 hover:text-white text-xl leading-none">×</button>
-          </div>
-        </div>
-      )}
+    <div className="min-h-screen bg-[#050810] text-slate-300 font-sans overflow-x-hidden relative">
+      
+      {/* --- FONDO CINÉTICO --- */}
+      <div className="fixed inset-0 overflow-hidden pointer-events-none">
+        <div className="absolute -top-[20%] -left-[10%] w-[70%] h-[70%] bg-indigo-900/20 blur-[120px] rounded-full animate-pulse" />
+        <div className="absolute top-[40%] -right-[10%] w-[50%] h-[50%] bg-fuchsia-900/10 blur-[100px] rounded-full" />
+        <div className="absolute inset-0 bg-[url('https://grainy-gradients.vercel.app/noise.svg')] opacity-20 mix-blend-overlay" />
+        <div className="absolute inset-0" style={{ backgroundImage: 'radial-gradient(circle at 2px 2px, rgba(255,255,255,0.05) 1px, transparent 0)', backgroundSize: '40px 40px' }} />
+      </div>
 
-      {/* Nav */}
-      <nav className="sticky top-0 z-50 border-b border-slate-800 bg-slate-950/80 backdrop-blur-md px-8 py-4 flex justify-between items-center">
-        <div className="flex items-center gap-3">
-          <div className="h-10 w-10 bg-gradient-to-tr from-indigo-600 to-fuchsia-600 rounded-xl flex items-center justify-center shadow-lg shadow-indigo-500/20">
-            <svg className="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13 10V3L4 14h7v7l9-11h-7z"/></svg>
+      {/* --- NOTIFICACIONES --- */}
+      <div className="fixed top-24 right-8 z-[100] flex flex-col gap-4">
+        {alertas.map((msg, i) => (
+          <div key={i} className="bg-slate-900/80 backdrop-blur-2xl border border-indigo-500/50 p-4 rounded-2xl shadow-2xl flex items-center gap-4 animate-in slide-in-from-right duration-500">
+            <span className="text-3xl">🦫</span>
+            <div>
+              <p className="text-[10px] font-black text-indigo-400 uppercase tracking-widest">Protocolo Activo</p>
+              <p className="text-sm font-bold text-white">Clase en 5 min: {msg}</p>
+            </div>
+            <button onClick={() => setAlertas(prev => prev.filter((_, idx) => idx !== i))} className="ml-4 text-slate-500 hover:text-white">×</button>
           </div>
-          <h1 className="text-2xl font-black tracking-tighter text-white uppercase italic">
-            AcademiX<span className="text-indigo-500 not-italic">Flow</span>
-          </h1>
+        ))}
+      </div>
+
+      {/* --- NAVEGACIÓN --- */}
+      <nav className="sticky top-0 z-50 bg-[#050810]/80 backdrop-blur-xl border-b border-white/5 px-8 py-5 flex justify-between items-center">
+        <div className="flex items-center gap-4 group">
+          <div className="h-12 w-12 bg-indigo-600 rounded-2xl flex items-center justify-center shadow-[0_0_20px_rgba(79,70,229,0.4)] group-hover:rotate-6 transition-transform">
+            <svg className="w-7 h-7 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M13 10V3L4 14h7v7l9-11h-7z"/></svg>
+          </div>
+          <div>
+            <h1 className="text-2xl font-black tracking-tighter text-white uppercase italic leading-none">AcademiX<span className="text-indigo-500 not-italic">Flow</span></h1>
+            <p className="text-[9px] font-bold text-slate-500 uppercase tracking-[0.3em] mt-1">Neural Interface v3.0</p>
+          </div>
         </div>
-        <div className="flex items-center gap-8">
-          <div className="hidden lg:block text-right">
-            <p className="text-xl font-mono font-bold text-white leading-none">
+        
+        <div className="flex items-center gap-10">
+          <div className="hidden md:flex flex-col items-end">
+            <p className="text-2xl font-mono font-black text-white tracking-tighter leading-none">
               {horaActual.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' })}
             </p>
-            <p className="text-[10px] text-indigo-400 font-bold uppercase tracking-widest mt-1">
-              {horaActual.toLocaleDateString('es-ES', { weekday: 'long' })}
-            </p>
+            <p className="text-[10px] font-bold text-indigo-400 uppercase tracking-widest mt-1">{horaActual.toLocaleDateString('es-ES', { weekday: 'long' })}</p>
           </div>
-          <button onClick={() => setModalAbierto(true)} className="bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-black uppercase tracking-widest px-6 py-3 rounded-full transition-all shadow-lg shadow-indigo-600/20">
-            + Agregar clase
+          <button onClick={() => setModalAbierto(true)} className="relative group overflow-hidden bg-white text-black px-8 py-3.5 rounded-2xl font-black text-xs uppercase tracking-widest transition-all hover:scale-105 active:scale-95">
+            <span className="relative z-10">+ New Module</span>
+            <div className="absolute inset-0 bg-indigo-500 translate-y-full group-hover:translate-y-0 transition-transform duration-300" />
           </button>
         </div>
       </nav>
 
-      <main className="max-w-7xl mx-auto px-6 py-12">
-        <section className="mb-12 flex flex-col md:flex-row justify-between items-start md:items-end gap-6">
-          <div>
-            <h2 className="text-5xl font-black text-white tracking-tight mb-2">Terminal Académica</h2>
-            <p className="text-slate-400 font-medium">Control central de flujo de asignaturas y laboratorios.</p>
+      <main className="max-w-7xl mx-auto px-8 py-12 relative">
+        
+        {/* --- DASHBOARD STATS --- */}
+        <section className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-16">
+          {[
+            { label: 'Total Módulos', val: clases.length, color: 'text-indigo-400' },
+            { label: 'Carga Semanal', val: `${clases.length * 2}h`, color: 'text-cyan-400' },
+            { label: 'Estado Sistema', val: 'Online', color: 'text-emerald-400' }
+          ].map((stat, i) => (
+            <div key={i} className="bg-white/5 border border-white/10 p-6 rounded-[2rem] backdrop-blur-sm">
+              <p className="text-[10px] font-black text-slate-500 uppercase tracking-widest mb-1">{stat.label}</p>
+              <p className={`text-3xl font-black ${stat.color}`}>{stat.val}</p>
+            </div>
+          ))}
+        </section>
+
+        {/* --- FILTROS --- */}
+        <div className="flex flex-col lg:flex-row justify-between items-center gap-8 mb-12">
+          <div className="relative w-full max-w-xl group">
+            <input 
+              type="text" 
+              placeholder="Deep search: Materia o Docente..." 
+              className="w-full bg-white/5 border border-white/10 p-5 pl-14 rounded-3xl focus:border-indigo-500/50 outline-none transition-all text-white placeholder:text-slate-600 focus:bg-white/10"
+              value={busqueda}
+              onChange={(e) => setBusqueda(e.target.value)}
+            />
+            <svg className="w-6 h-6 absolute left-5 top-5 text-slate-600 group-focus-within:text-indigo-400 transition-colors" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/></svg>
           </div>
-          <div className="flex flex-wrap items-center bg-slate-900 border border-slate-800 p-2 rounded-2xl">
+
+          <div className="flex bg-white/5 p-1.5 rounded-[1.5rem] border border-white/10 overflow-x-auto max-w-full">
             {diasFiltro.map(dia => (
-              <button key={dia} onClick={() => setDiaFiltro(dia)}
-                className={`px-5 py-2 rounded-xl text-xs font-bold transition-all ${diaFiltro === dia ? 'bg-indigo-600 text-white shadow-lg' : 'text-slate-500 hover:text-slate-300'}`}>
+              <button 
+                key={dia} 
+                onClick={() => setDiaFiltro(dia)}
+                className={`px-6 py-3 rounded-2xl text-[10px] font-black uppercase tracking-widest transition-all ${diaFiltro === dia ? 'bg-indigo-600 text-white shadow-xl' : 'text-slate-500 hover:text-slate-300'}`}
+              >
                 {dia}
               </button>
             ))}
           </div>
-        </section>
-
-        <div className="mb-12 relative group">
-          <input type="text" placeholder="Filtrar por núcleo o docente..."
-            className="w-full bg-slate-900/50 border border-slate-800 p-5 pl-14 rounded-3xl focus:ring-2 focus:ring-indigo-500 outline-none transition-all text-white placeholder:text-slate-600"
-            value={busqueda} onChange={(e) => setBusqueda(e.target.value)} />
-          <svg className="w-6 h-6 absolute left-5 top-5 text-slate-600 group-focus-within:text-indigo-500 transition-colors" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/></svg>
         </div>
 
+        {/* --- GRID DE MÓDULOS --- */}
         {clasesFiltradas.length === 0 ? (
-          <div className="text-center py-20 border border-dashed border-slate-800 rounded-3xl">
-            <p className="text-slate-500">No hay clases que coincidan.</p>
+          <div className="py-32 text-center bg-white/5 border border-dashed border-white/10 rounded-[3rem]">
+            <div className="text-5xl mb-4 opacity-20">📡</div>
+            <p className="text-slate-500 font-bold uppercase tracking-widest text-sm">No se detectan señales en este cuadrante</p>
           </div>
         ) : (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-10">
             {clasesFiltradas.map(clase => {
               const theme = colorThemes[clase.color] || colorThemes.indigo;
               return (
-                <div key={clase.id} className={`group relative bg-slate-900 border ${theme.border} p-8 rounded-[2.5rem] transition-all hover:-translate-y-2 shadow-2xl ${theme.glow}`}>
-                  <div className="flex justify-between items-start mb-8">
-                    <span className={`${theme.badge} text-slate-950 text-[10px] font-black px-4 py-1.5 rounded-full uppercase tracking-tighter`}>{clase.tipo}</span>
-                    {/* FIX: aria-label con nombre de la clase para accesibilidad */}
-                    <button onClick={() => eliminarClase(clase.id)} className="text-slate-600 hover:text-red-400 text-sm" aria-label={`Eliminar ${clase.materia}`}>✕</button>
+                <div 
+                  key={clase.id} 
+                  className={`group relative bg-gradient-to-br ${theme.gradient} bg-slate-900 border ${theme.border} p-10 rounded-[3rem] transition-all hover:-translate-y-3 shadow-2xl ${theme.glow}`}
+                >
+                  <div className="flex justify-between items-start mb-10">
+                    <span className={`${theme.badge} text-black text-[9px] font-black px-4 py-1.5 rounded-full uppercase tracking-[0.15em]`}>
+                      {clase.tipo}
+                    </span>
+                    <button 
+                      onClick={() => setClases(prev => prev.filter(c => c.id !== clase.id))} 
+                      className="h-10 w-10 flex items-center justify-center rounded-full border border-white/5 text-slate-600 hover:text-red-500 hover:bg-red-500/10 transition-all"
+                    >
+                      <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg>
+                    </button>
                   </div>
-                  <h3 className={`text-2xl font-black text-white mb-6 leading-[1.1] group-hover:${theme.text} transition-colors`}>{clase.materia}</h3>
-                  <div className="space-y-4 mb-8">
-                    <div className="flex items-center gap-4 text-slate-400">
-                      <div className={`w-10 h-10 rounded-xl bg-slate-800 flex items-center justify-center ${theme.icon}`}>
-                        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"/></svg>
+
+                  <h3 className="text-3xl font-black text-white mb-8 leading-[1.1] tracking-tight group-hover:text-white transition-colors uppercase italic">
+                    {clase.materia}
+                  </h3>
+
+                  <div className="space-y-6 mb-12">
+                    <div className="flex items-center gap-5">
+                      <div className="h-12 w-12 rounded-2xl bg-white/5 flex items-center justify-center text-xl">👤</div>
+                      <div>
+                        <p className="text-[9px] font-black text-slate-500 uppercase tracking-widest">Docente Titular</p>
+                        <p className="text-sm font-bold text-slate-200">{clase.profesor}</p>
                       </div>
-                      <span className="text-sm font-bold">{clase.profesor}</span>
                     </div>
-                    <div className="flex items-center gap-4 text-slate-400">
-                      <div className={`w-10 h-10 rounded-xl bg-slate-800 flex items-center justify-center ${theme.icon}`}>
-                        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z"/><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 11a3 3 0 11-6 0 3 3 0 016 0z"/></svg>
+                    <div className="flex items-center gap-5">
+                      <div className="h-12 w-12 rounded-2xl bg-white/5 flex items-center justify-center text-xl">📍</div>
+                      <div>
+                        <p className="text-[9px] font-black text-slate-500 uppercase tracking-widest">Coordenadas</p>
+                        <p className="text-sm font-bold text-slate-200">{clase.sala}</p>
                       </div>
-                      <span className="text-sm font-bold">{clase.sala}</span>
                     </div>
                   </div>
-                  <div className="pt-6 border-t border-slate-800 flex items-center justify-between">
+
+                  <div className="pt-8 border-t border-white/5 flex justify-between items-end">
                     <div>
-                      <p className="text-[10px] font-black text-slate-500 uppercase tracking-widest">{clase.dia}</p>
-                      <p className="text-lg font-mono font-bold text-white">{clase.horario}</p>
+                      <p className="text-[10px] font-black text-indigo-400 uppercase tracking-[0.2em] mb-1">{clase.dia}</p>
+                      <p className="text-2xl font-mono font-black text-white tracking-tighter">{clase.horario}</p>
+                    </div>
+                    <div className={`h-14 w-14 rounded-3xl ${theme.badge} flex items-center justify-center text-black shadow-lg shadow-indigo-500/20 group-hover:scale-110 transition-transform`}>
+                      <svg className="w-7 h-7" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" d="M14 5l7 7m0 0l-7 7m7-7H3"/></svg>
                     </div>
                   </div>
                 </div>
@@ -211,70 +244,74 @@ export default function AcademiXFlow() {
         )}
       </main>
 
-      {modalAbierto && <ModalNuevaClase onClose={() => setModalAbierto(false)} onSave={agregarClase} />}
-    </div>
-  );
-}
+      {/* --- MODAL NEURAL FORM --- */}
+      {modalAbierto && (
+        <div className="fixed inset-0 z-[200] flex items-center justify-center p-6 animate-in fade-in duration-300">
+          <div className="absolute inset-0 bg-[#050810]/95 backdrop-blur-md" onClick={() => setModalAbierto(false)} />
+          <form 
+            onSubmit={(e) => {
+              e.preventDefault();
+              const d = new FormData(e.target);
+              const nueva = {
+                id: Date.now(),
+                materia: d.get('materia'),
+                profesor: d.get('profesor') || 'N/A',
+                sala: d.get('sala') || 'TBD',
+                dia: d.get('dia'),
+                horario: `${d.get('hI')} - ${d.get('hF')}`,
+                tipo: d.get('tipo'),
+                color: d.get('color')
+              };
+              setClases(prev => [...prev, nueva]);
+              setModalAbierto(false);
+            }}
+            className="relative w-full max-w-2xl bg-slate-900 border border-white/10 p-12 rounded-[3.5rem] shadow-[0_0_50px_rgba(0,0,0,0.5)]"
+          >
+            <h3 className="text-4xl font-black text-white mb-10 tracking-tighter uppercase italic">Inject Module</h3>
+            
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-8 mb-10">
+              <div className="space-y-2">
+                <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest ml-1">Materia *</label>
+                <input name="materia" required className="w-full bg-white/5 border border-white/10 p-4 rounded-2xl outline-none focus:border-indigo-500 transition-all text-white" />
+              </div>
+              <div className="space-y-2">
+                <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest ml-1">Docente</label>
+                <input name="profesor" className="w-full bg-white/5 border border-white/10 p-4 rounded-2xl outline-none focus:border-indigo-500 transition-all text-white" />
+              </div>
+              <div className="space-y-2">
+                <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest ml-1">Día</label>
+                <select name="dia" className="w-full bg-slate-800 border border-white/10 p-4 rounded-2xl outline-none text-white appearance-none">
+                  {diasSemana.slice(1).map(d => <option key={d}>{d}</option>)}
+                </select>
+              </div>
+              <div className="space-y-2">
+                <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest ml-1">Ubicación</label>
+                <input name="sala" className="w-full bg-white/5 border border-white/10 p-4 rounded-2xl outline-none focus:border-indigo-500 transition-all text-white" />
+              </div>
+              <div className="flex gap-4">
+                <input type="time" name="hI" defaultValue="08:00" className="flex-1 bg-white/5 border border-white/10 p-4 rounded-2xl text-white" />
+                <input type="time" name="hF" defaultValue="10:00" className="flex-1 bg-white/5 border border-white/10 p-4 rounded-2xl text-white" />
+              </div>
+              <div className="space-y-2">
+                <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest ml-1">Visual ID</label>
+                <div className="flex gap-3">
+                  {colores.map(c => (
+                    <label key={c} className="cursor-pointer">
+                      <input type="radio" name="color" value={c} defaultChecked={c === 'indigo'} className="hidden peer" />
+                      <div className={`h-10 w-10 rounded-xl ${colorThemes[c].badge} border-4 border-transparent peer-checked:border-white transition-all`} />
+                    </label>
+                  ))}
+                </div>
+              </div>
+            </div>
 
-function ModalNuevaClase({ onClose, onSave }) {
-  const [form, setForm] = useState({
-    materia: '', profesor: '', sala: '', dia: 'Lunes',
-    horaInicio: '08:00', horaFin: '10:00', tipo: 'Teórica', color: 'indigo',
-  });
-
-  // FIX: Nombre descriptivo en vez de `set` genérico
-  const updateField = (key, val) => setForm(prev => ({ ...prev, [key]: val }));
-
-  const submit = (e) => {
-    e.preventDefault();
-    if (!form.materia.trim()) return;
-
-    // FIX: Validación de que horaFin sea posterior a horaInicio
-    if (form.horaFin <= form.horaInicio) {
-      alert('La hora de fin debe ser posterior a la hora de inicio.');
-      return;
-    }
-
-    onSave({
-      materia: form.materia.trim(),
-      profesor: form.profesor.trim() || '—',
-      sala: form.sala.trim() || '—',
-      dia: form.dia,
-      horario: `${form.horaInicio} - ${form.horaFin}`,
-      tipo: form.tipo,
-      color: form.color,
-    });
-  };
-
-  return (
-    <div className="fixed inset-0 z-[200] bg-black/70 backdrop-blur-sm flex items-center justify-center p-4" onClick={onClose}>
-      <form onClick={(e) => e.stopPropagation()} onSubmit={submit}
-        className="w-full max-w-lg bg-slate-900 border border-slate-800 rounded-3xl p-8 space-y-4">
-        <h3 className="text-2xl font-black text-white mb-2">Nueva clase</h3>
-        <input className="w-full bg-slate-950 border border-slate-800 rounded-xl p-3 text-white" placeholder="Materia" value={form.materia} onChange={e => updateField('materia', e.target.value)} required />
-        <input className="w-full bg-slate-950 border border-slate-800 rounded-xl p-3 text-white" placeholder="Profesor" value={form.profesor} onChange={e => updateField('profesor', e.target.value)} />
-        <input className="w-full bg-slate-950 border border-slate-800 rounded-xl p-3 text-white" placeholder="Sala" value={form.sala} onChange={e => updateField('sala', e.target.value)} />
-        <div className="grid grid-cols-2 gap-3">
-          <select className="bg-slate-950 border border-slate-800 rounded-xl p-3 text-white" value={form.dia} onChange={e => updateField('dia', e.target.value)}>
-            {diasSemana.slice(1).map(d => <option key={d}>{d}</option>)}
-          </select>
-          <select className="bg-slate-950 border border-slate-800 rounded-xl p-3 text-white" value={form.tipo} onChange={e => updateField('tipo', e.target.value)}>
-            <option>Teórica</option><option>Práctica</option><option>Laboratorio</option>
-          </select>
-          <input type="time" className="bg-slate-950 border border-slate-800 rounded-xl p-3 text-white" value={form.horaInicio} onChange={e => updateField('horaInicio', e.target.value)} />
-          <input type="time" className="bg-slate-950 border border-slate-800 rounded-xl p-3 text-white" value={form.horaFin} onChange={e => updateField('horaFin', e.target.value)} />
+            <div className="flex gap-4">
+              <button type="button" onClick={() => setModalAbierto(false)} className="flex-1 py-5 rounded-3xl font-black text-[10px] uppercase tracking-widest text-slate-500 hover:text-white transition-colors">Abort</button>
+              <button type="submit" className="flex-[2] bg-indigo-600 py-5 rounded-3xl font-black text-[10px] uppercase tracking-widest text-white hover:bg-indigo-500 shadow-xl shadow-indigo-600/20 transition-all">Initialize Module</button>
+            </div>
+          </form>
         </div>
-        <div className="flex gap-2">
-          {colores.map(c => (
-            <button type="button" key={c} onClick={() => updateField('color', c)}
-              className={`h-9 w-9 rounded-full border-2 ${form.color === c ? 'border-white' : 'border-transparent'} ${colorThemes[c].badge}`} />
-          ))}
-        </div>
-        <div className="flex justify-end gap-3 pt-2">
-          <button type="button" onClick={onClose} className="px-5 py-2 rounded-full text-slate-400 hover:text-white">Cancelar</button>
-          <button type="submit" className="px-6 py-2 rounded-full bg-indigo-600 hover:bg-indigo-500 text-white font-bold">Guardar</button>
-        </div>
-      </form>
+      )}
     </div>
   );
 }
