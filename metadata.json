@@ -1,6 +1,16 @@
 {
   "name": "UniSched Pro",
-  "description": "Plataforma de gestión de horarios universitarios inteligente y moderna.",
-  "requestFramePermissions": [],
-  "majorCapabilities": []
+  "short_name": "UniSched",
+  "description": "Plataforma de gestión de horarios universitarios inteligente.",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#f9fafb",
+  "theme_color": "#1d4ed8",
+  "icons":[
+    {
+      "src": "/logo.svg",
+      "sizes": "192x192",
+      "type": "image/svg+xml"
+    }
+  ]
 }
